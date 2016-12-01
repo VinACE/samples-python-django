@@ -17,7 +17,7 @@
     "mock-okta:debug": "DEBUG=mock-okta npm run mock-okta",
     "wrap": "node tools/wrap-dependencies",
     "prestart": "node tools/copy-static",
-    "start": "echo \"\n--- REPLACE THIS! ---\n\" && exit 1;"
+    "start": "PYTHONUNBUFFERED=\"not_buffered\" python3 lib/manage.py runserver 3000"
   },
   "devDependencies": {
     "chalk": "1.1.3",

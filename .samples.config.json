@@ -7,7 +7,7 @@
   },
   "server": {
     "staticDir": "dist",
-    "startSignal": "bundle is now VALID",
+    "startSignal": "Starting development server",
     "port": 3000
   },
   "mockOkta": {
