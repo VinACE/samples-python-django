@@ -14,6 +14,7 @@ import os
 import json
 import sys
 
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,7 +28,10 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 # Okta Configuration
-OKTA_JSON = json.load(open(BASE_DIR[:-3] + '/.samples.config.json'))
+OKTA_JSON = json.load(open(BASE_DIR[:-3] + ".samples.config.json"))
+
+# Public key cache
+PUBLIC_KEY_CACHE = {}
 
 # Application definition
 
@@ -59,7 +63,7 @@ STATIC_ROOT = os.path.join(BASE_DIR[:-3], "dist/")
 TEMPLATES = [
     {
         'BACKEND': 'django_mustache.Mustache',
-        'DIRS' : [
+        'DIRS': [
             TEMPLATES_DIR,
             STATIC_ROOT
         ],
@@ -71,7 +75,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
-            'partials_dir': 'partials',
+            'partials_dir': 'docs',
             'file_extension': 'mustache',
         },
     },
@@ -110,7 +114,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.9/topics/i18n/

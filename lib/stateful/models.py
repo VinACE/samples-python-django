@@ -6,11 +6,12 @@ from django.contrib.auth.models import User
 
 import requests
 
+
 class DiscoveryDocument:
     # Find the OIDC metadata through discovery
 
     def __init__(self, base_url):
-        r = requests.get(base_url + "/.well-known/openid-configuration")
+        r = requests.get(base_url + '/.well-known/openid-configuration')
         self.json = r.json()
 
     def getJson(self):
@@ -49,9 +50,10 @@ class TokenManager:
 
 class Struct:
     # Convert dict into object
-    
+
     def __init__(self, **entries):
         self.__dict__.update(entries)
+
 
 class Profile(models.Model):
     # Extended user model to contain tokens

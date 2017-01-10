@@ -1,17 +1,18 @@
-from django.shortcuts import render
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, logout, login
+from django.core.exceptions import ObjectDoesNotExist
+from django.conf import settings
 
 from .models import DiscoveryDocument, TokenManager, Struct, Profile
-
-import requests, json, sys
 from .tokens import token_validation
 from .openid import call_token_endpoint
+from .util import get_partial
 
-from django.conf import settings
+import requests
+import json
+import sys
 
 
 # GLOBALS
@@ -19,126 +20,158 @@ okta_config = Struct(**settings.OKTA_JSON)
 
 
 def scenarios_controller(request):
-    # Clear cookies on render
-    response = render(request, 'index.mustache', {'oidc': okta_config.oidc, 'user': {}})
-    delete_cookies(response)
-    return response
+    renderer = get_partial('docs/overview')
+    
+    return HttpResponse(
+        renderer.render_path(
+            settings.TEMPLATES_DIR + '/index.mustache',
+            {'config': okta_config, 'user': {}}))
 
 
 def login_redirect_controller(request):
-    return render(request, 'index.mustache', {'oidc': okta_config.oidc, 'user': {}})
+    renderer = get_partial('docs/login-redirect')
+    
+    return HttpResponse(
+        renderer.render_path(
+            settings.TEMPLATES_DIR + '/index.mustache',
+            {'config': okta_config, 'user': {}}))
 
 
 def login_custom_controller(request):
-    return render(request, 'index.mustache', {'oidc': okta_config.oidc, 'user': {}})
+    renderer = get_partial('docs/login-custom')
+    
+    return HttpResponse(
+        renderer.render_path(
+            settings.TEMPLATES_DIR + '/index.mustache',
+            {'config': okta_config, 'user': {}}))
 
 
 def profile_controller(request):
-    user = User.objects.get(username=request.user)
-    claims = user.profile.tokens.claims
-    params = {'email': request.user, 'claims': Struct(**claims)}
+    # Verify user is signed in and display profile contents
 
-    response = render(request, 'index.mustache', {'oidc': okta_config.oidc, 'user': params})
-    delete_cookies(response)
-    return response
+    try:
+        user = User.objects.get(username=request.user)
+    except ObjectDoesNotExist:
+        return redirect('/')
+
+    params = {
+        'email': request.user,
+        'claims': Struct(**user.profile.tokens.claims)
+    }
+
+    renderer = get_partial('docs/profile')
+    
+    return HttpResponse(
+        renderer.render_path(
+            settings.TEMPLATES_DIR + '/index.mustache',
+            {'config': okta_config, 'user': params}))
 
 
 def callback_controller(request):
     # Handles the token exchange from the redirect
-    def token_request(auth_code, nonce):
-        # Setup Token Request
-        token_endpoint = '{}/oauth2/v1/token?'.format(okta_config.oidc['oktaUrl'])
 
-        tokens = call_token_endpoint(token_endpoint, auth_code, okta_config.oidc)
-        
-        user = None
+    state = None
+    nonce = None
 
-        if tokens != None:
-            if 'id_token' in tokens:
-                # Perform token validation
-                claims = token_validation(tokens['id_token'], okta_config.oidc, nonce)
-                                
-                if claims:
-                    # Authenticate User
-                    user = validate_user(claims)
-                    user.profile.tokens.set_id_token(tokens['id_token'])
-                    user.profile.tokens.set_claims(claims)
-
-            if 'access_token' in tokens:
-                user.profile.tokens.set_access_token(tokens['access_token'])
-
-        return user, user.profile.tokens.get_json()
-
-    if request.POST:
-        return HttpResponse('Endpoint not supported')
-    
+    # Get state and nonce from cookie
+    if ('okta-oauth-state' in request.COOKIES and
+            'okta-oauth-nonce' in request.COOKIES):
+        # Current AuthJS Cookie Setters
+        state = request.COOKIES['okta-oauth-state']
+        nonce = request.COOKIES['okta-oauth-nonce']
     else:
-        state = ""
-        nonce = ""
-        
-        # Get state and nonce from cookie
-        if 'okta-oauth-state' in request.COOKIES:
-            # Current AuthJS Cookie Setters
-            state = request.COOKIES["okta-oauth-state"]
-            nonce = request.COOKIES["okta-oauth-nonce"]
+        return HttpResponse('Error setting and/or retrieving cookies',
+                            status=401)
 
-        else:
-            # Widget Cookie Setters
-            if 'okta-oauth-redirect-params' in request.COOKIES:
-                cookies = json.loads(request.COOKIES['okta-oauth-redirect-params'])
-                if cookies:
-                    state = cookies['state']
-                    nonce = cookies['nonce']
-            else:
-                return HttpResponse("Error setting and/or retrieving cookies")
+    # Verify state
+    if not state or request.GET['state'] != state:
+        return HttpResponse('State from cookie does not match query state',
+                            status=401)
 
-        # Verify state
-        if not state or request.GET['state'] != state:
-            return HttpResponse("Value {} does not match the assigned state -> {}".format(request.GET['state'], state))
-                
-        user, token_manager_json = token_request(request.GET['code'], nonce)
-        request.session['tokens'] = token_manager_json
+    # Verify code exists
+    if 'code' not in request.GET:
+        return HttpResponse('Code was not returned', status=401)
 
-        if user is None:
-            return redirect('/login')
-        
-        login(request, user)
+    # Setup Token Request
+    token_endpoint = '{}/oauth2/v1/token?'.format(okta_config.oidc['oktaUrl'])
 
-        return redirect('/authorization-code/profile')
+    tokens = call_token_endpoint(
+        token_endpoint,
+        request.GET['code'],
+        okta_config.oidc)
+
+    if not tokens:
+        # No tokens returned from /token endpoint
+        return HttpResponse('Error retrieving tokens', status=401)
+
+    if 'id_token' not in tokens:
+        # id_token was not returned
+        return HttpResponse('No id_token in response from /token endpoint',
+                            status=401)
+
+    if tokens['id_token'] is None:
+        # id_token is set to None
+        return HttpResponse('id_token is None', status=401)
+
+    message, status = token_validation(tokens, okta_config, nonce)
+
+    if status == 401:
+        return HttpResponse(message, status=status)
+
+    claims = message
+
+    user = validate_user(claims)
+    if user is None:
+        # Verify user authenticated
+        return HttpResponse('No user object', status=401)
+
+    user.profile.tokens.set_id_token(tokens['id_token'])
+    user.profile.tokens.set_claims(claims)
+
+    if 'access_token' in tokens:
+        user.profile.tokens.set_access_token(tokens['access_token'])
+
+    # Log the user in
+    login(request, user)
+
+    return redirect('/authorization-code/profile')
 
 
-@login_required(redirect_field_name=None, login_url='/authorization-code/login')
 def logout_controller(request):
+    # Log user out
+
+    # Clear existing user
+    user = User.objects.get(username=request.user).delete()
     logout(request)
+
     return redirect('/')
 
 
 def validate_user(claims):
     # Create user for django session
+
     user = authenticate(
         username=claims['email'],
         password=claims['sub']
     )
+
     if user is None:
         # Create user
-        User.objects.create_user(
+        new_user = User.objects.create_user(
             claims['email'],
             claims['email'],
             claims['sub']
         )
+
         user = authenticate(
             username=claims['email'],
             password=claims['sub']
         )
+
+    # Update user profile
+    if not hasattr(user, 'profile'):
         profile = Profile()
         profile.user = user
         profile.save()
 
     return user
-
-
-def delete_cookies(response):
-    # Delete authJS/widget cookies
-    response.delete_cookie('okta-oauth-nonce')
-    response.delete_cookie('okta-oauth-state')
-    response.delete_cookie('okta-oauth-redirect-params')

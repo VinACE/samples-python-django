@@ -1,179 +1,86 @@
-import time
-import jwt as jwt_python 
-from jose import jwt
-from jose import jws
+from django.conf import settings
+
+from jose import jwt, jws
+from datetime import datetime
+from datetime import timedelta
+
+import calendar
 import requests
 
-# Validate token (Taken from http://openid.net/specs/openid-connect-core-1_0.html#TokenResponseValidation)
+
+def fetch_jwk_for(id_token=None):
+    if id_token is None:
+        raise NameError('id_token is required')
+
+    # FIXME: This should be pulled from the OpenID connect Discovery Document
+    jwks_uri = 'http://127.0.0.1:7777/oauth2/v1/keys'
+
+    unverified_header = jws.get_unverified_header(id_token)
+    key_id = None
+
+    if 'kid' in unverified_header:
+        key_id = unverified_header['kid']
+    else:
+        raise ValueError('The id_token header must contain a "kid"')
+
+    if key_id in settings.PUBLIC_KEY_CACHE:
+        return settings.PUBLIC_KEY_CACHE[key_id]
+
+    # FIXME: Make sure that we rate-limit outbound requests
+    # (Karl used bucket rate limiting here 'leaky bucket')
+    r = requests.get(jwks_uri)
+    jwks = r.json()
+
+    for key in jwks['keys']:
+        jwk_id = key['kid']
+        settings.PUBLIC_KEY_CACHE[jwk_id] = key
+
+    if key_id in settings.PUBLIC_KEY_CACHE:
+        return settings.PUBLIC_KEY_CACHE[key_id]
+    else:
+        raise RuntimeError('Unable to fetch public key from jwks_uri')
 
 
-def token_validation(token, config, nonce):
-    # Perform Token Validation
+def token_validation(tokens, okta_config, nonce):
+    # Perform token validation
 
-    
-    def jwks(kid, url):
-        # Get keys from jwks_uri
+    try:
+        clock_skew = 300
+        jwks_with_public_key = fetch_jwk_for(tokens['id_token'])
 
-        r = requests.get(url)
-        jwks = r.json()
-        for key in jwks['keys']:
-            if kid == key['kid']:
-                return key
-        return None
+        jwt_kwargs = {
+            'algorithms': jwks_with_public_key['alg'],
+            'options': {
+                # FIXME: Remove when mock server returns valid access_tokens
+                'verify_at_hash': False,
+                # Used for leeway on the 'exp' claim
+                'leeway': clock_skew
+            },
+            'issuer': okta_config.oidc['oktaUrl'],
+            'audience': okta_config.oidc['clientId']
+        }
 
+        if 'access_token' in tokens:
+            jwt_kwargs['access_token'] = tokens['access_token']
 
-    while(True):
-    # Callback for token validation
-        
-        try:
-            
-            """ Step 1
+        claims = jwt.decode(
+            tokens['id_token'],
+            jwks_with_public_key,
+            **jwt_kwargs)
 
-                If encrypted, decrypt it using the keys and algorithms specified in the meta_data
-                    If encryption was negotiated but not provided, REJECT
-            """
-            decoded_token = jwt_python.decode(token, verify=False)
-            dirty_alg = jwt.get_unverified_header(token)['alg']
-            dirty_kid = jwt.get_unverified_header(token)['kid']
-            
-            # The below code block SHOULD be implemented when mock-okta server supports metadate @ openid_config
-            '''
-            # Get discovery document
-            r = requests.get(decoded_token['iss'] + "/.well-known/openid-configuration")
-            discovery = r.json()
+        if nonce != claims['nonce']:
+            return 'invalid nonce', 401
 
-            dirty_key = jwks(dirty_kid, discovery["jwks_uri"])
-            if not dirty_key:
-                raise ValueError("Key id {} is not valid".format(dirty_kid))
+        # Validate 'iat' claim
+        plus_time_now_with_clock_skew = (datetime.utcnow() +
+                                         timedelta(seconds=clock_skew))
+        plus_acceptable_iat = calendar.timegm(
+            (plus_time_now_with_clock_skew).timetuple())
 
-            try:
-                # Validate the key
-                jws.verify(token, dirty_key, algorithms=[dirty_alg])
-            except Exception as err:
-                print(err)
-                raise
-            
-            if discovery['issuer'] != decoded_token['iss']:
-                """ Step 2
+        if 'iat' in claims and claims['iat'] > plus_acceptable_iat:
+            return 'invalid iat claim', 401
 
-                    Issuer Identifier for the OpenID Provider (which is typically
-                    obtained during Discovery) MUST exactly match the value of the iss (issuer) Claim.
-                """
-                raise ValueError('Discovery document Issuer does not match client_id')
-            '''
-            if decoded_token['iss'] != config['oktaUrl']:
-                """ Step 3
+        return claims, 200
 
-                    Client MUST validate:
-                        aud (audience) contains the same `client_id` registered
-                        iss (issuer) identified as the aud (audience)
-                        aud (audience) Claim MAY contain an array with more than one element (Not implemented by Okta)
-                    The ID Token MUST be rejected if the ID Token does not list the Client as a valid
-                    audience, or if it contains additional audiences not trusted by the Client.
-                """
-                raise ValueError('Issuer does not match client_id')
-            
-
-            if isinstance(decoded_token['aud'], str):
-                # Single element
-                
-                if decoded_token['aud'] != config['clientId']:
-                    raise ValueError('Audience does not match client_id')
-            
-            if isinstance(decoded_token['aud'], list):
-                # Multiple aud values
-                exists = [aud for aud in decoded_token['aud'] if aud == config['clientId']]
-                
-                if len(exists) == 0:
-                    raise ValueError('No Issuers match client_id')
-                else:
-                    if 'azp' in decoded_token:
-                        """ Step 4
-
-                            If ID Token contains multiple audiences, verify that an azp claim is present
-                        """
-                        
-                        if decoded_token['azp'] != config['clientId']:
-                            """ Step 5
-
-                                If azp (authorized part), verify client_id matches
-                            """
-                            
-                            raise ValueError('azp value does not match client_id')
-                    else:
-                        raise ValueError('azp value not provided')
-            
-                        
-            """ Step 6 : TLS server validation not implemented by Okta
-
-                If ID Token is received via direct communication between Client and Token Endpoint,
-                TLS server validation may be used to validate the issuer in place of checking token
-                signature. MUST validate according to JWS algorithm specialized in JWT alg Header.
-                MUST use keys provided.
-            """
-                        
-            '''
-            if dirty_alg not in discovery['id_token_signing_alg_values_supported']:
-                """ Step 7
-
-                    The alg value SHOULD default to RS256 or sent in id_token_signed_response_alg param during Registration
-                """
-                
-                raise ValueError('alg provided in token does not match id_token_signing_alg_values_supported')
-            '''         
-
-            """ Step 8 : Not implemented due to Okta configuration
-
-                If JWT alg Header uses MAC based algorithm (HS256, HS384, etc) the octets of UTF-8 of the
-                client_secret corresponding to the client_id are contained in the aud (audience) are
-                used to validate the signature. For MAC based, if aud is multi-valued or if azp value
-                is different than aud value - behavior is unspecified.
-            """
-
-            if decoded_token['exp'] < int(time.time()):
-                """ Step 9
-
-                The current time MUST be before the time represented by exp
-                """
-                
-                raise ValueError('exp provided has expired')
-
-            '''
-            if decoded_token['iat'] < (int(time.time()) - 5000):
-                """ Step 10 - Defined 'too far away time' : approx 24hrs
-
-                    The iat can be used to reject tokens that were issued too far away from current time,
-                    limiting the time that nonces need to be stored to prevent attacks. 
-                """
-                raise ValueError('iat too far in the past ( > 5 minutes)')
-            '''
-
-            if nonce is not None:
-                """ Step 11
-
-                    If a nonce value is sent in the Authentication Request, a nonce MUST be present and be
-                    the same value as the one sent in the Authentication Request. Client SHOULD check for nonce value
-                    to prevent replay attacks.
-                """
-                if nonce != decoded_token['nonce']:
-                    raise ValueError('nonce value does not match Authentication Request nonce')
-
-            
-            """ Step 12:  Not implemented by Okta
-                
-                If acr was requested, check that the asserted Claim Value is appropriate
-            """
-
-            '''
-            if 'auth_time' in decoded_token:
-                """ Step 13
-
-                    If auth_time was requested, check claim value and request re-authentication if too much time elapsed
-                """
-                if decoded_token['auth_time'] < (int(time.time()) - 5000):
-                    raise ValueError('auth_time too far in past ( > 5 minutes)')
-            '''
-            return decoded_token
-
-        except ValueError as err:
-            return err
+    except Exception as err:
+        return str(err), 401
