@@ -28,10 +28,7 @@ urlpatterns = [
         name='logout_controller'),
 ]
 
-urlpatterns += static('/css/',
+urlpatterns += static('assets/css/',
                       document_root=settings.STATIC_ROOT + 'css/')
-urlpatterns += static('/images/',
-                      document_root=settings.STATIC_ROOT + 'images/')
-urlpatterns += static('/js/',
-                      document_root=settings.STATIC_ROOT + 'js/')
-urlpatterns += static('/', document_root=settings.STATIC_ROOT + '')
+
+urlpatterns += static('assets/', document_root=settings.STATIC_ROOT + '')

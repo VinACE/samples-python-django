@@ -22,3 +22,7 @@ if ! npm install; then
   echo "npm install failed! Exiting..."
   exit ${FAILED_SETUP}
 fi
+
+# Python Django specific setup
+apt-get --assume-yes install python3-pip
+pip3 install -r requirements.txt

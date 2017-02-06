@@ -1,5 +1,6 @@
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, logout, login
 from django.core.exceptions import ObjectDoesNotExist
@@ -8,7 +9,6 @@ from django.conf import settings
 from .models import DiscoveryDocument, TokenManager, Struct, Profile
 from .tokens import token_validation
 from .openid import call_token_endpoint
-from .util import get_partial
 
 import requests
 import json
@@ -16,34 +16,32 @@ import sys
 
 
 # GLOBALS
-okta_config = Struct(**settings.OKTA_JSON)
+config = Struct(**settings.OKTA_JSON)
+okta_config = Struct(**config.oktaSample)
 
 
 def scenarios_controller(request):
-    renderer = get_partial('docs/overview')
+    return render(
+        request,
+        settings.TEMPLATES_DIR + '/overview.mustache',
+        {'config': okta_config, 'user': {}}
+    )
     
-    return HttpResponse(
-        renderer.render_path(
-            settings.TEMPLATES_DIR + '/index.mustache',
-            {'config': okta_config, 'user': {}}))
-
 
 def login_redirect_controller(request):
-    renderer = get_partial('docs/login-redirect')
-    
-    return HttpResponse(
-        renderer.render_path(
-            settings.TEMPLATES_DIR + '/index.mustache',
-            {'config': okta_config, 'user': {}}))
+    return render(
+        request,
+        settings.TEMPLATES_DIR + '/login-redirect.mustache',
+        {'config': okta_config, 'user': {}}
+    )
 
 
 def login_custom_controller(request):
-    renderer = get_partial('docs/login-custom')
-    
-    return HttpResponse(
-        renderer.render_path(
-            settings.TEMPLATES_DIR + '/index.mustache',
-            {'config': okta_config, 'user': {}}))
+    return render(
+        request,
+        settings.TEMPLATES_DIR + '/login-custom.mustache',
+        {'config': okta_config, 'user': {}}
+    )
 
 
 def profile_controller(request):
@@ -59,13 +57,11 @@ def profile_controller(request):
         'claims': Struct(**user.profile.tokens.claims)
     }
 
-    renderer = get_partial('docs/profile')
-    
-    return HttpResponse(
-        renderer.render_path(
-            settings.TEMPLATES_DIR + '/index.mustache',
-            {'config': okta_config, 'user': params}))
-
+    return render(
+        request,
+        settings.TEMPLATES_DIR + '/profile.mustache',
+        {'config': okta_config, 'user': params}
+    )
 
 def callback_controller(request):
     # Handles the token exchange from the redirect

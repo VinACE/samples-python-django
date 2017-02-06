@@ -8,12 +8,12 @@ import calendar
 import requests
 
 
-def fetch_jwk_for(id_token=None):
+def fetch_jwk_for(base_url, id_token=None):
     if id_token is None:
         raise NameError('id_token is required')
 
     # FIXME: This should be pulled from the OpenID connect Discovery Document
-    jwks_uri = 'http://127.0.0.1:7777/oauth2/v1/keys'
+    jwks_uri = '{}/oauth2/v1/keys'.format(base_url)
 
     unverified_header = jws.get_unverified_header(id_token)
     key_id = None
@@ -46,7 +46,7 @@ def token_validation(tokens, okta_config, nonce):
 
     try:
         clock_skew = 300
-        jwks_with_public_key = fetch_jwk_for(tokens['id_token'])
+        jwks_with_public_key = fetch_jwk_for(okta_config.oidc['oktaUrl'], tokens['id_token'])
 
         jwt_kwargs = {
             'algorithms': jwks_with_public_key['alg'],

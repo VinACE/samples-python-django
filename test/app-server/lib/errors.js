@@ -283,3 +283,4 @@ exports.CODE_LOGOUT_REDIRECT = `
       The /authorization-code/logout page should redirect to /. To fix, redirect
       to "http://localhost:${config.server.port}/" after deleting the user session.
 `;
+
