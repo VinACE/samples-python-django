@@ -13,7 +13,7 @@
 /* eslint no-console: 0 */
 const fs = require('fs-extra');
 const path = require('path');
-const config = require('../../.samples.config.json');
+const config = require('../../.samples.config.json').oktaSample;
 
 const rootDir = path.resolve(__dirname, '../../');
 

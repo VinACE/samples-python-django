@@ -17,7 +17,7 @@
     "mock-okta:debug": "DEBUG=mock-okta npm run mock-okta",
     "wrap": "node tools/wrap-dependencies",
     "prestart": "node tools/copy-static",
-    "start": "PYTHONUNBUFFERED=\"not_buffered\" python3 lib/manage.py runserver 3000",
+    "start": "echo \"\n--- REPLACE THIS! ---\n\" && exit 1;",
     "test:e2e": "webdriver-manager update && protractor test/e2e/conf.js",
     "test:mock-okta": "node test/app-server/lib/test-mock-okta",
     "test:app-server": "mocha test/app-server/index --bail --timeout 15000",
