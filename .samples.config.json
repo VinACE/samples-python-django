@@ -9,7 +9,9 @@
     "server": {
       "staticDir": "dist",
       "startSignal": "Starting development server",
-      "port": 3000
+      "port": 3000,
+      "framework": "django",
+      "environment": "python"
     },
     "mockOkta": {
       "port": 7777,
@@ -17,9 +19,5 @@
       "proxied": "http://rain.okta1.com:1802",
       "cdn": "http://cdn.okta1.com"
     }
-  },
-  "server": {
-    "framework": "django",
-    "environment": "python"
   }
 }

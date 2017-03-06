@@ -1,4 +1,5 @@
-# React and Django Sample Application
+# AngularJS 1.x and django Sample Application
+
 ### Table of Contents
 
   - [Introduction](#introduction)
@@ -6,10 +7,10 @@
     - [Custom Login Form](#2-custom-login-form)
   - [Prerequisites](#prerequisites)
   - [Quick Start](#quick-start)
-  - [Front End](#front-end-react)
+  - [Front End](#front-end)
     - [Login Redirect](#login-redirect)
     - [Custom Login Form](#custom-login-form)
-  - [Back End](#back-end-django)
+  - [Back End](#back-end)
     - [Routes](#routes)
     - [Handle the Redirect](#handle-the-redirect)
     - [Code Exchange](#code-exchange)
@@ -22,122 +23,98 @@
   
 ## Introduction
 
-This tutorial will demonstrate how to use OAuth 2.0 and OpenID Connect to add authentication to a [React](https://facebook.github.io/react/) and [Django](https://www.djangoproject.com/) application.
+This tutorial will demonstrate how to use OAuth 2.0 and OpenID Connect to add authentication to a python/django application.
 
 ### 1. Login Redirect
 
 Users are redirected to your Okta organization for authentication.
 
-<img src="https://raw.githubusercontent.com/jmelberg-okta/doc-assets/master/samples/redirect.png" width="300" >
+<img src="docs/assets/redirect.png" width="300" />
 
-After authenticating into your Okta organization, an authorization code is returned in a callback URL. This authorization code is then exchanged for an `id_token`.
+After logging into your Okta organization, an authorization code is returned in a callback URL. This authorization code is then exchanged for an `id_token`.
 
 ### 2. Custom Login Form
 
-The Okta Sign-In Widget is fully customizable via CSS and JavaScript. You can change how the widget [looks with CSS](http://developer.okta.com/code/javascript/okta_sign-in_widget#customizing-style-with-css) and [configured with JavaScript](http://developer.okta.com/code/javascript/okta_sign-in_widget#customizing-widget-features-and-text-labels-with-javascript).
+The Okta Sign-In Widget is a fully customizable login experience. You can change how the widget [looks with CSS](http://developer.okta.com/code/javascript/okta_sign-in_widget#customizing-style-with-css) and [is configured with JavaScript](http://developer.okta.com/code/javascript/okta_sign-in_widget#customizing-widget-features-and-text-labels-with-javascript).
 
-<img src="https://raw.githubusercontent.com/jmelberg-okta/doc-assets/master/samples/custom.png" width="300">
+<img src="docs/assets/custom.png" width="300" />
 
-This custom-branded login experience uses the [Okta Sign-In Widget](http://developer.okta.com/code/javascript/okta_sign-in_widget) to perform authentication, returning an authorization code to be exchanged for an `id_token`.
+This custom-branded login experience uses the [Okta Sign-In Widget](http://developer.okta.com/code/javascript/okta_sign-in_widget) to perform authentication, returning an authorization code that is then exchanged for an `id_token`.
 
 ## Prerequisites
 
-Ensure [Node.js](https://nodejs.org/en/) is installed and updated to the most recent version
+This sample app depends on [Node.js](https://nodejs.org/en/) for frontend dependencies and some build scripts - if you don't have it, install it from [nodejs.org](https://nodejs.org/en/).
 
-```
+```bash
+# Verify that node is installed
 $ node -v
 ```
-Download the sample application from GitHub
 
-```
-$ git clone git@github.com:okta/samples-python-django.git
-```
-Create an isolated virtual environment
-Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/) via pip:
-```
-[samples-python-django]$ pip install virtualenv
-```
-Create the virtual environment:
-```
-[samples-python-django]$ virtualenv venv
-```
-Activate the virtual environment:
-```
-[samples-python-django]$ source venv/bin/activate
-```
-When you are finished working inside of the virtual environment, you can deactivate it:
-```
-(venv)[samples-python-django]$ deactivate
+Then, clone this sample from GitHub and install the frontend dependencies:
+```bash
+# Clone the repo and navigate to the samples-python-django dir
+$ git clone git@github.com:okta/samples-python-django.git && cd samples-python-django
+
+# Install the frontend dependencies
+[samples-python-django]$ npm install
 ```
 
-Update frontend to React
-Switch the frontend from `samples-js-angular-1` to `samples-js-react` inside of `tools/copy-static`:
-``` javascript
-// index.js
+{{ SAMPLE-DEVELOPER: ADD EXTRA SETUP HERE }}
 
-const frontend = 'samples-js-react';
-```
-
-Install required dependencies inside of `samples-python-django`
-```
-(venv)[samples-python-django]$ npm install
-(venv)[samples-python-django]$ npm install @okta/samples-js-react
-(venv)[samples-python-django]$ pip3 install -r requirements.txt
-```
 
 ## Quick Start
 
-Start the back-end for your sample application with `npm start` or `python3 lib/manage.py runserver 3000`. This will start the app server on [http://localhost:3000](http://localhost:3000).
+Start the back-end for your sample application with `npm start` or ` {{ SAMPLE-DEVELOPER: ADD START SCRIPT HERE }} `. This will start the app server on [http://localhost:3000](http://localhost:3000).
 
-By default, this application uses a mock authorization server which responds to API requests similar to a production environment. This grants us access to multiple users without the need to set up another application. To use it, run the mock server on [http://127.0.0.1:7777](http://127.0.0.1:7777) by entering the following in a second terminal window:
-```
-[terminal2:samples-python-django]$ npm run mock-okta
+By default, this application uses a mock authorization server which responds to API requests like a configured Okta org - it's useful if you haven't yet set up OpenID Connect but would still like to try this sample. 
+
+To start the mock server, run the following in a second terminal window:
+```bash
+# Starts the mock Okta server at http://127.0.0.01:7777
+[samples-python-django]$ npm run mock-okta
 ```
 
-To use your [Okta Developer](http://developer.okta.com/) organization, follow the [app integration instructions for OAuth 2.0 and OpenID Connect Single Page Applications](https://gist.github.com/jmelberg-okta/cabe7ee5784997c37465724deb00fa04). Then, replace the `oidc` object with the appropriate fields. For example:
+If you'd like to test this sample against your own Okta org, follow [these steps to setup an OpenID Connect app](docs/assets/oidc-app-setup.md). Then, replace the *oidc* settings in `samples.config.json` to point to your new app:
 ```javascript
 // .samples.config.json
-
 {
   "oidc": {
-    "oktaUrl": "https://example.oktapreview.com",
-    "clientId": "hereIsMyClientId",
-    "clientSecret": "hereIsMyClientSecret",
+    "oktaUrl": "https://{{yourOktaOrg}}.oktapreview.com",
+    "clientId": "{{yourClientId}}",
+    "clientSecret": "{{yourClientSecret}}",
     "redirectUri": "http://localhost:3000/authorization-code/callback"
   }
 }
 ```
 
-## Front-end (React)
+## Front-end
 
-When you run `npm install`, a copy of the [React](https://github.com/okta/samples-js-react) front-end application is copied into the `dist/` directory. More information about the controllers and views are available in the [React project repository](https://github.com/okta/samples-js-react/blob/master/README.md).
+When you start this sample, the [AngularJS 1.x UI](https://github.com/okta/samples-js-angular-1) is copied into the `dist/` directory. More information about the AngularJS controllers and views are available in the [AngularJS project repository](https://github.com/okta/samples-js-angular-1/blob/master/README.md).
 
 ### Login Redirect
 
-With React, we include the event trigger `onClick` to begin the login process. When the link is clicked, it calls the `login` function defined in `LoginRedirect.js`. Let’s take a look at how the `OktaAuth` object is created.
+With AngularJS, we include the template directive `ng-click` to begin the login process. When the link is clicked, it calls the `login()` function defined in `login-redirect.controller.js`. Let’s take a look at how the `OktaAuth` object is created.
 
 ```javascript
-// LoginRedirect.js
+// login-redirect.controller.js
 
-class LoginRedirect extends React.Component {
-
-  constructor(props) {
-    super(props);
-    this.login = this.login.bind(this);
-    const config = this.props.route.config;
+class LoginRedirectController {
+   constructor(config) {
+    this.config = config;
+  }
+   $onInit() {
     this.authClient = new OktaAuth({
-      url: config.oktaUrl,
-      clientId: config.clientId,
-      redirectUri: config.redirectUri,
+      url: this.config.oktaUrl,
+      clientId: this.config.clientId,
+      redirectUri: this.config.redirectUri,
       scopes: ['openid', 'email', 'profile'],
     });
   }
-
-  login(e) {
-    e.stopPropagation();
-    e.preventDefault();
+ 
+  login() {
     this.authClient.token.getWithRedirect({ responseType: 'code' });
   }
+}
 ```
 
 There are a number of different ways to construct the login redirect URL.
@@ -146,121 +123,83 @@ There are a number of different ways to construct the login redirect URL.
 2. Use an OpenID Connect / OAuth 2.0 middleware library
 3. Use [AuthJS](http://developer.okta.com/code/javascript/okta_auth_sdk)
 
-We use AuthJS to create the URL and perform the redirect. An `OktaAuth` object is instantiated with the configuration in `.samples.config.json`. When the `login()` function is called from the view, it calls the [`/authorize`](http://developer.okta.com/docs/api/resources/oauth2.html#authentication-request) endpoint to start the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1).
+In this sample, we use AuthJS to create the URL and perform the redirect. An `OktaAuth` object is instantiated with the configuration in `.samples.config.json`. When the `login()` function is called from the view, it calls the [`/authorize`](http://developer.okta.com/docs/api/resources/oauth2.html#authentication-request) endpoint to start the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1).
  
 
 You can read more about the `OktaAuth` configuration options here: [OpenID Connect with Okta AuthJS SDK](http://developer.okta.com/code/javascript/okta_auth_sdk#social-authentication-and-openid-connect).
 
-**Important:** When the authorization code is exchanged for an `accessToken` and/or `idToken`, the tokens *MUST* be [validated](#validation).
+**Important:** When the authorization code is exchanged for an `access_token` and/or `id_token`, the tokens **must** be [validated](#validation). We'll cover that in a bit.
 
 ### Custom Login Form
-
-To render the [Okta Sign-In Widget](http://developer.okta.com/code/javascript/okta_sign-in_widget), include a container element on the page for the widget to attach to. In this sample, we add a `<div>` with an `id` of `sign-in-container`:
+To render the [Okta Sign-In Widget](http://developer.okta.com/code/javascript/okta_sign-in_widget), include a container element on the page for the widget to attach to:
 
 ```html
-<!-- index.mustache -->
-<div id="sign-in-container">...</div>
+<!-- overview.mustache -->
+<div id="sign-in-container"></div>
 ```
-Next, we can configure and render the [Okta Sign-In Widget](https://github.com/okta/okta-signin-widget#configuration).
 
+Then, initialize the widget with the [OIDC configuration](https://github.com/okta/okta-signin-widget#openid-connect) options:
 ``` javascript
-// LoginCustom.js
+// login-custom.controller.js
+class LoginCustomController {
+  constructor(config) {
+    this.config = config;
+  }
  
-class LoginCustom extends React.Component {
-
-  componentDidMount() {
-    const config = this.props.route.config;
+  $onInit() {
     const signIn = new SignIn({
-      baseUrl: config.oktaUrl,
-      clientId: config.clientId,
-      redirectUri: config.redirectUri,
+      baseUrl: this.config.oktaUrl,
+      clientId: this.config.clientId,
+      redirectUri: this.config.redirectUri,
       authParams: {
         responseType: 'code',
         scopes: ['openid', 'email', 'profile'],
       },
-      i18n: {
-        en: {
-          'primaryauth.title': 'Use john/Asdf1234 for the mock Okta server',
-        },
-      },
     });
     signIn.renderEl({ el: '#sign-in-container' }, () => {});
   }
+}
 ```
-To perform the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1), we set the `responseType` to `code`. This returns an `accessToken` and/or `idToken` through the [`/token`](http://developer.okta.com/docs/api/resources/oauth2.html#token-request) OpenID Connect endpoint. 
+To perform the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1), we set the `responseType` to `code`. This returns an `access_token` and/or `id_token` through the [`/token`](http://developer.okta.com/docs/api/resources/oauth2.html#token-request) OpenID Connect endpoint.
 
 **Note:** Additional configuration for the `SignIn` object is available at [OpenID Connect, OAuth 2.0, and Social Auth with Okta](https://github.com/okta/okta-signin-widget#configuration).
 
-## Back-end (Django)
-
+## Back-end
 To complete the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1), your back-end server performs the following tasks:
   - Handle the [Authorization Code code exchange](https://tools.ietf.org/html/rfc6749#section-1.3.1) callback
-  - [Validate](http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) the `idToken`
+  - [Validate](http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) the `id_token`
   - Set `user` session in the app
   - Log the user out
 
 ### Routes
+To render the AngularJS templates, we define the following django routes:
 
-To render the React templates, we define the following Django controllers:
-  - `authorization-code/login-redirect/` renders the [login redirect](#login-redirect) flow
-  - `authorization-code/login-custom/` renders the [custom login](#custom-login-form) flow
-  - `authorization-code/callback/` handles the redirect from Okta
-  - `authorization-code/profile/` renders the logged in state, displaying profile information
-  - `authorization-code/logout/` closes the `user` session
+| Route                                 | Description                                                 |
+| ------------------------------------- | ----------------------------------------------------------- |
+| **authorization-code/login-redirect** | renders the [login redirect](#login-redirect) flow          |
+| **authorization-code/login-custom**   | renders the [custom login](#custom-login-form) flow         |
+| **authorization-code/callback**       | handles the redirect from Okta                              |
+| **authorization-code/profile**        | renders the logged in state, displaying profile information |
+| **authorization-code/logout**         | closes the `user` session                                   |
 
 ### Handle the Redirect
-
 After successful authentication, an authorization code is returned to the redirectUri:
 ```
-http://127.0.0.1:7777/callback?code=authorizationCodeWillGoHere&state=OAuth2StateWillGoHere
+http://localhost:3000/authorization-code/callback?code={{code}}&state={{state}}
 ```
 
-Two cookies are created after authentication: `okta-oauth-nonce` and `okta-auth-state`. You **[MUST](https://www.ietf.org/rfc/rfc2119.txt)** verify the returned `state` value in the URL matches the `state` value created.
+Two cookies are created after authentication: `okta-oauth-nonce` and `okta-auth-state`. You **must** verify the returned `state` value in the URL matches the `state` value created.
 
-For example:
-```python
-# views.py
+In this sample, we verify the state here:
 
-if ('okta-oauth-state' in request.COOKIES and 'okta-oauth-nonce' in request.COOKIES):
-    # Current AuthJS Cookie Setters
-    state = request.COOKIES['okta-oauth-state']
-    nonce = request.COOKIES['okta-oauth-nonce']
-else:
-    return HttpResponse('Error setting and/or retrieving cookies', status=401)
-```
+{{ SAMPLE-DEVELOPER: ADD CHECKING FOR COOKIES HERE }}
 
 ### Code Exchange
+Next, we exchange the returned authorization code for an `id_token` and/or `access_token`. You can choose the best [token authentication method](http://developer.okta.com/docs/api/resources/oauth2.html#token-request) for your application. In this sample, we use the default token authentication method `client_secret_basic`:
 
-Next, we must exchange an authorization code for an `idToken` and/or `accessToken`. You can choose the best [token authentication method](http://developer.okta.com/docs/api/resources/oauth2.html#token-request) for your application. For this sample, we use the default token authentication method `client_secret_basic`:
+{{ SAMPLE-DEVELOPER: ADD TOKEN REQUEST CODE HERE }}
 
-```python
-# openid.py
-
-def call_token_endpoint(url, code, config):
-    """ Call /token endpoint
-        Returns accessToken, idToken, or both
-    """
-    auth = HTTPBasicAuth(config['clientId'], config['clientSecret'])
-    header = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'Connection': 'close'
-    }
-
-    params = 'grant_type=authorization_code&code={}&redirect_uri={}'.format(
-        urllib.parse.quote_plus(code),
-        urllib.parse.quote_plus(config['redirectUri'])
-    )
-
-    url_encoded = '{}{}'.format(url, params)
-
-    # Send token request
-    r = requests.post(url_encoded, auth=auth, headers=header)
-
-    return r.json()
-
-```
-A successful response returns an `idToken` which looks similar to:
+A successful response returns an `id_token` which looks similar to:
 ```
 eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIwMHVpZDRCeFh3Nkk2VFY0bTBnMyIsImVtYWlsIjoid2VibWFzd
 GVyQGNsb3VkaXR1ZGUubmV0IiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInZlciI6MSwiaXNzIjoiaHR0cD
@@ -273,184 +212,70 @@ ehamfnUAO4JL14PkemF45Pn3u_6KKwxJnxcWxLvMuuisnvIs7NScKpOAab6ayZU0VL8W6XAijQmnYTt
 MWQfSuaaR8rYOaWHrffh3OypvDdrQuYacbkT0csxdrayXfBG3UF5-
 ZAlhfch1fhFT3yZFdWwzkSDc0BGygfiFyNhCezfyT454wbciSZgrA9ROeHkfPCaX7KCFO8GgQEkGRoQ
 ntFBNjluFhNLJIUkEFovEDlfuB4tv_M8BM75celdy3jkpOurg
-
 ```
 
 ### Validation
+After receiving the `id_token`, we [validate](http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) the token and its claims to prove its integrity. 
 
-After receiving the `idToken`, we must first [validate](http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) the token to prove its integrity. First, we check if the token is a JWT. This can be performed easily as OpenID Connect [JWTs](https://tools.ietf.org/html/draft-ietf-oauth-json-web-token-32#section-3) have a set format.
+In this sample, we use the {{ SAMPLE-DEVELOPER: ADD TOKEN LIBRARY INFO HERE }} library to decode and validate the token.
 
-We use a [JSON Object Signing and Encryption (JOSE)](https://github.com/mpdavis/python-jose) library to decode and validate the token. Choose the best library that fits your development needs.
-
-
-We verify the `id_token` using the following steps:
+There are a couple things we need to verify:
 
 1. [Verify the signature](#verify-signature)
 2. [Verify the *iss* (issuer), *aud* (audience), and *exp* (expiry) time](#verify-fields)
 3. [Verify the *iat* (issued at) time](#verify-issued-time)
 4. [Verify the *nonce*](#verify-nonce)
 
-Learn more about validating tokens in [OpenID Connect Resources](http://developer.okta.com/docs/api/resources/oidc.html#validating-id-tokens).
+You can learn more about validating tokens in [OpenID Connect Resources](http://developer.okta.com/docs/api/resources/oidc.html#validating-id-tokens).
 
 #### Verify signature
+An `id_token` contains a [public key id](https://tools.ietf.org/html/rfc7517#section-4.5) (`kid`). To verify the signature, we use the [Discovery Document](http://developer.okta.com/docs/api/resources/oidc.html#openid-connect-discovery-document) to find the `jwks_uri`, which will return a list of public keys. It is safe to cache or persist these keys for performance, but Okta rotates them periodically. We strongly recommend dynamically retrieving these keys.
 
-An `id_token` should contain a [public key id](https://tools.ietf.org/html/rfc7517#section-4.5) (`kid`). To verify the signature, we use the [Discovery Document](http://developer.okta.com/docs/api/resources/oidc.html#openid-connect-discovery-document) to find the `jwks_uri`, which will return a list of public keys. It is safe to cache or persist these keys for performance, but Okta rotates them periodically. We strongly recommend dynamically retrieving keys if the `id_token`'s `kid` has not been cached. For example: If the `kid` has been cached, you can use it to validate the signature. If not, make a request to the OAuth 2.0 [`/keys`](http://developer.okta.com/docs/api/resources/oidc.html#get-keys) endpoint. 
+For example:
+- If the `kid` has been cached, use it to validate the signature.
+- If not, make a request to the `jwks_uri`. Cache the new `jwks`, and use the response to validate the signature.
 
-```python
-# tokens.py
+{{ SAMPLE-DEVELOPER: ADD JWKS AND CACHING CODE HERE }}
 
-def fetch_jwk_for(id_token=None):
-    if id_token is None:
-        raise NameError('id_token is required')
-
-    # This will be pulled from the OpenID connect Discovery Document
-    jwks_uri = 'http://127.0.0.1:7777/oauth2/v1/keys'
-
-    unverified_header = jws.get_unverified_header(id_token)
-    key_id = None
-
-    if 'kid' in unverified_header:
-        key_id = unverified_header['kid']
-    else:
-        raise ValueError('The id_token header must contain a "kid"')
-
-    if key_id in settings.PUBLIC_KEY_CACHE:
-        # If we've already cached this JWK, return it
-        return settings.PUBLIC_KEY_CACHE[key_id]
-
-    # If it's not in the cache, get the latest JWKS from /oauth2/v1/keys
-    r = requests.get(jwks_uri)
-    jwks = r.json()
-
-    for key in jwks['keys']:
-        jwk_id = key['kid']
-        settings.PUBLIC_KEY_CACHE[jwk_id] = key
-
-    if key_id in settings.PUBLIC_KEY_CACHE:
-        return settings.PUBLIC_KEY_CACHE[key_id]
-    else:
-        raise RuntimeError('Unable to fetch public key from jwks_uri')
-```
 
 #### Verify fields
 
-Using the `jwt.decode()` method, we pass in a dictionary containing the `issuer`, `audience`, and `clock_skew` to verify that:
+Verify the `id_token` from the [Code Exchange](#code-exchange) contains our expected claims:
 
   - The `issuer` is identical to the host where authorization was performed
   - The `clientId` stored in our configuration matches the `aud` claim
   - If the token expiration time has passed, the token must be revoked
 
-```python
-# tokens.py
+{{ SAMPLE-DEVELOPER: ADD VERIFY FIELDS CODE HERE }}
 
-# A clock skew of five minutes is considered to account for
-# differences in server times
-clock_skew = 300
-
-jwks_with_public_key = fetch_jwk_for(tokens['id_token'])
-
-jwt_kwargs = {
-    'algorithms': jwks_with_public_key['alg'],
-    'options': {
-        'verify_at_hash': False,
-        # Used for leeway on the 'exp' claim
-        'leeway': clock_skew
-    },
-    'issuer': okta_config.oidc['oktaUrl'],
-    'audience': okta_config.oidc['clientId']
-}
-
-claims = jwt.decode(
-    tokens['id_token'],
-    jwks_with_public_key,
-    **jwt_kwargs)
-```
 
 #### Verify issued time
-
 The `iat` value indicates what time the token was "issued at". We verify that this claim is valid by checking that the token was not issued in the future, with some leeway for clock skew.
 
-```python
-# tokens.py
+{{ SAMPLE-DEVELOPER: ADD VERIFY IAT CODE HERE }}
 
-# Validate 'iat' claim
-plus_time_now_with_clock_skew = (datetime.utcnow() +
-                                 timedelta(seconds=clock_skew))
-plus_acceptable_iat = calendar.timegm(
-    (plus_time_now_with_clock_skew).timetuple())
-
-if 'iat' in claims and claims['iat'] > plus_acceptable_iat:
-    return 'invalid iat claim', 401
-```
 
 #### Verify nonce
-
 To mitigate replay attacks, verify that the `nonce` value in the `id_token` matches the `nonce` stored in the cookie `okta-oauth-nonce`.
 
-```python
-# tokens.py
-if nonce != claims['nonce']:
-    return 'invalid nonce', 401
-```
+{{ SAMPLE-DEVELOPER: ADD VERIFY NONCE CODE HERE }}
 
 ### Set user session
+If the `id_token` passes validation, we can then set the `user` session in our application.
 
-If the `idToken` passes validation, we can then set the `user` session in our application. In a production environment, you look up the `user` in a user store, and set the session for that user. In this sample, we simplify this process by setting the session as a new `user` object and store the email address in a session object using [Django authentication](https://docs.djangoproject.com/en/1.10/topics/auth/).
+In a production app, this code would lookup the `user` from a user store and set the session for that user. However, for simplicity, in this sample we set the session with the claims from the `id_token`.
 
-```python
-# views.py
-
-def validate_user(claims):
-    # Create user for django session
-
-    user = authenticate(
-        username=claims['email'],
-        password=claims['sub']
-    )
-
-    if user is None:
-        # Create user
-        new_user = User.objects.create_user(
-            claims['email'],
-            claims['email'],
-            claims['sub']
-        )
-
-        user = authenticate(
-            username=claims['email'],
-            password=claims['sub']
-        )
-
-    # Update user profile
-    if not hasattr(user, 'profile'):
-        profile = Profile()
-        profile.user = user
-        profile.save()
-
-    return user
-```
+{{ SAMPLE-DEVELOPER: ADD SETTING USER SESSION CODE HERE }}
 
 ### Logout
+In django, you can clear the the user session by:
 
-To clear the user session, we use Django's built-in `logout` method to ensure the user's session has ended. The Okta session is terminated in our client-side code.
+{{ SAMPLE-DEVELOPER: ADD LOGOUT CODE HERE }}
 
-```python
-# views.py
-
-def logout_controller(request):
-    # Log user out
-
-    # Clear existing user
-    user = User.objects.get(username=request.user).delete()
-    logout(request)
-
-    return redirect('/')
-```
+The Okta session is terminated in our client-side code.
 
 ## Conclusion
-
-You have now successfully authenticated with Okta! Now what? With a user's `idToken`, you have basic claims into the user's identity. You can extend the set of claims by modifying the `response_type` and `scopes` to retrieve custom information about the user. This includes `locale`, `address`, `phone_number`, `groups`, and [more](http://developer.okta.com/docs/api/resources/oidc.html#scopes). 
-
+You have now successfully authenticated with Okta! Now what? With a user's `id_token`, you have basic claims into the user's identity. You can extend the set of claims by modifying the `response_type` and `scopes` to retrieve custom information about the user. This includes `locale`, `address`, `phone_number`, `groups`, and [more](http://developer.okta.com/docs/api/resources/oidc.html#scopes).
 
 ## Support 
 

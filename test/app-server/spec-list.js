@@ -13,4 +13,3 @@
 require('./specs/basic-spec');
 require('./specs/overview-spec');
 require('./specs/authorization-code-spec');
-
