@@ -10,6 +10,7 @@
   - [Front End](#front-end)
     - [Login Redirect](#login-redirect)
     - [Custom Login Form](#custom-login-form)
+    - [Using a different front-end](#using-a-different-front-end)
   - [Back End](#back-end)
     - [Routes](#routes)
     - [Handle the Redirect](#handle-the-redirect)
@@ -43,28 +44,44 @@ This custom-branded login experience uses the [Okta Sign-In Widget](http://devel
 
 ## Prerequisites
 
-This sample app depends on [Node.js](https://nodejs.org/en/) for frontend dependencies and some build scripts - if you don't have it, install it from [nodejs.org](https://nodejs.org/en/).
+This sample app depends on [Node.js](https://nodejs.org/en/) for front-end dependencies and some build scripts - if you don't have it, install it from [nodejs.org](https://nodejs.org/en/).
 
 ```bash
 # Verify that node is installed
 $ node -v
 ```
 
-Then, clone this sample from GitHub and install the frontend dependencies:
+Then, clone this sample from GitHub and install the front-end dependencies:
 ```bash
 # Clone the repo and navigate to the samples-python-django dir
 $ git clone git@github.com:okta/samples-python-django.git && cd samples-python-django
 
-# Install the frontend dependencies
+# Install the front-end dependencies
 [samples-python-django]$ npm install
 ```
 
-{{ SAMPLE-DEVELOPER: ADD EXTRA SETUP HERE }}
+Create an isolated virtual environment
+Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/) via pip:
+```
+[samples-python-django]$ pip install virtualenv
+```
+Create the virtual environment:
+```
+[samples-python-django]$ virtualenv venv
+```
+Activate the virtual environment:
+```
+[samples-python-django]$ source venv/bin/activate
+```
+When you are finished working inside of the virtual environment, you can deactivate it:
+```
+(venv)[samples-python-django]$ deactivate
+```
 
 
 ## Quick Start
 
-Start the back-end for your sample application with `npm start` or ` {{ SAMPLE-DEVELOPER: ADD START SCRIPT HERE }} `. This will start the app server on [http://localhost:3000](http://localhost:3000).
+Start the back-end for your sample application with `npm start` or `python3 lib/manage.py runserver 3000`. This will start the app server on [http://localhost:3000](http://localhost:3000).
 
 By default, this application uses a mock authorization server which responds to API requests like a configured Okta org - it's useful if you haven't yet set up OpenID Connect but would still like to try this sample. 
 
@@ -164,6 +181,28 @@ To perform the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#sec
 
 **Note:** Additional configuration for the `SignIn` object is available at [OpenID Connect, OAuth 2.0, and Social Auth with Okta](https://github.com/okta/okta-signin-widget#configuration).
 
+### Using a different front-end
+
+By default, this end-to-end sample ships with our [Angular 1 front-end sample](https://github.com/okta/samples-js-angular-1). To run this back-end with a different front-end:
+
+1. Choose the front-end
+
+    | Framework | NPM module | Github |
+    |-----------|------------|--------|
+    | Angular 1 | [@okta/samples-js-angular-1](https://www.npmjs.com/package/@okta/samples-js-angular-1) | https://github.com/okta/samples-js-angular-1 |
+    | React | [@okta/samples-js-react](https://www.npmjs.com/package/@okta/samples-js-react) | https://github.com/okta/samples-js-react |
+    | Elm | [@okta/samples-elm](https://www.npmjs.com/package/@okta/samples-elm) | https://github.com/okta/samples-elm |
+
+
+2. Install the front-end
+
+    ```bash
+    # Use the NPM module for the front-end you want to install. I.e. for React:
+    [samples-python-django]$ npm install @okta/samples-js-react
+    ```
+
+3. Restart the server. You should be up and running with the new front-end!
+
 ## Back-end
 To complete the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1), your back-end server performs the following tasks:
   - Handle the [Authorization Code code exchange](https://tools.ietf.org/html/rfc6749#section-1.3.1) callback
@@ -192,12 +231,47 @@ Two cookies are created after authentication: `okta-oauth-nonce` and `okta-auth-
 
 In this sample, we verify the state here:
 
-{{ SAMPLE-DEVELOPER: ADD CHECKING FOR COOKIES HERE }}
+```python
+# views.py
+
+if ('okta-oauth-state' in request.COOKIES and 'okta-oauth-nonce' in request.COOKIES):
+    # Current AuthJS Cookie Setters
+    state = request.COOKIES['okta-oauth-state']
+    nonce = request.COOKIES['okta-oauth-nonce']
+else:
+    return HttpResponse('Error setting and/or retrieving cookies', status=401)
+```
 
 ### Code Exchange
 Next, we exchange the returned authorization code for an `id_token` and/or `access_token`. You can choose the best [token authentication method](http://developer.okta.com/docs/api/resources/oauth2.html#token-request) for your application. In this sample, we use the default token authentication method `client_secret_basic`:
 
-{{ SAMPLE-DEVELOPER: ADD TOKEN REQUEST CODE HERE }}
+```python
+# openid.py
+
+def call_token_endpoint(url, code, config):
+    """ Call /token endpoint
+        Returns accessToken, idToken, or both
+    """
+    auth = HTTPBasicAuth(config['clientId'], config['clientSecret'])
+    header = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Connection': 'close'
+    }
+
+    params = 'grant_type=authorization_code&code={}&redirect_uri={}'.format(
+        urllib.parse.quote_plus(code),
+        urllib.parse.quote_plus(config['redirectUri'])
+    )
+
+    url_encoded = '{}{}'.format(url, params)
+
+    # Send token request
+    r = requests.post(url_encoded, auth=auth, headers=header)
+
+    return r.json()
+
+```
 
 A successful response returns an `id_token` which looks similar to:
 ```
@@ -217,7 +291,7 @@ ntFBNjluFhNLJIUkEFovEDlfuB4tv_M8BM75celdy3jkpOurg
 ### Validation
 After receiving the `id_token`, we [validate](http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) the token and its claims to prove its integrity. 
 
-In this sample, we use the {{ SAMPLE-DEVELOPER: ADD TOKEN LIBRARY INFO HERE }} library to decode and validate the token.
+In this sample, we use a [JSON Object Signing and Encryption (JOSE)](https://github.com/mpdavis/python-jose) library to decode and validate the token.
 
 There are a couple things we need to verify:
 
@@ -235,7 +309,41 @@ For example:
 - If the `kid` has been cached, use it to validate the signature.
 - If not, make a request to the `jwks_uri`. Cache the new `jwks`, and use the response to validate the signature.
 
-{{ SAMPLE-DEVELOPER: ADD JWKS AND CACHING CODE HERE }}
+```python
+# tokens.py
+
+def fetch_jwk_for(id_token=None):
+    if id_token is None:
+        raise NameError('id_token is required')
+
+    # This will be pulled from the OpenID connect Discovery Document
+    jwks_uri = 'http://127.0.0.1:7777/oauth2/v1/keys'
+
+    unverified_header = jws.get_unverified_header(id_token)
+    key_id = None
+
+    if 'kid' in unverified_header:
+        key_id = unverified_header['kid']
+    else:
+        raise ValueError('The id_token header must contain a "kid"')
+
+    if key_id in settings.PUBLIC_KEY_CACHE:
+        # If we've already cached this JWK, return it
+        return settings.PUBLIC_KEY_CACHE[key_id]
+
+    # If it's not in the cache, get the latest JWKS from /oauth2/v1/keys
+    r = requests.get(jwks_uri)
+    jwks = r.json()
+
+    for key in jwks['keys']:
+        jwk_id = key['kid']
+        settings.PUBLIC_KEY_CACHE[jwk_id] = key
+
+    if key_id in settings.PUBLIC_KEY_CACHE:
+        return settings.PUBLIC_KEY_CACHE[key_id]
+    else:
+        raise RuntimeError('Unable to fetch public key from jwks_uri')
+```
 
 
 #### Verify fields
@@ -246,31 +354,113 @@ Verify the `id_token` from the [Code Exchange](#code-exchange) contains our expe
   - The `clientId` stored in our configuration matches the `aud` claim
   - If the token expiration time has passed, the token must be revoked
 
-{{ SAMPLE-DEVELOPER: ADD VERIFY FIELDS CODE HERE }}
+```python
+# tokens.py
+
+# A clock skew of five minutes is considered to account for
+# differences in server times
+clock_skew = 300
+
+jwks_with_public_key = fetch_jwk_for(tokens['id_token'])
+
+jwt_kwargs = {
+    'algorithms': jwks_with_public_key['alg'],
+    'options': {
+        'verify_at_hash': False,
+        # Used for leeway on the 'exp' claim
+        'leeway': clock_skew
+    },
+    'issuer': okta_config.oidc['oktaUrl'],
+    'audience': okta_config.oidc['clientId']
+}
+
+claims = jwt.decode(
+    tokens['id_token'],
+    jwks_with_public_key,
+    **jwt_kwargs)
+```
 
 
 #### Verify issued time
 The `iat` value indicates what time the token was "issued at". We verify that this claim is valid by checking that the token was not issued in the future, with some leeway for clock skew.
 
-{{ SAMPLE-DEVELOPER: ADD VERIFY IAT CODE HERE }}
+
+```python
+# tokens.py
+
+# Validate 'iat' claim
+plus_time_now_with_clock_skew = (datetime.utcnow() +
+                                 timedelta(seconds=clock_skew))
+plus_acceptable_iat = calendar.timegm(
+    (plus_time_now_with_clock_skew).timetuple())
+
+if 'iat' in claims and claims['iat'] > plus_acceptable_iat:
+    return 'invalid iat claim', 401
+```
 
 
 #### Verify nonce
 To mitigate replay attacks, verify that the `nonce` value in the `id_token` matches the `nonce` stored in the cookie `okta-oauth-nonce`.
 
-{{ SAMPLE-DEVELOPER: ADD VERIFY NONCE CODE HERE }}
+```python
+# tokens.py
+if nonce != claims['nonce']:
+    return 'invalid nonce', 401
+```
 
 ### Set user session
 If the `id_token` passes validation, we can then set the `user` session in our application.
 
 In a production app, this code would lookup the `user` from a user store and set the session for that user. However, for simplicity, in this sample we set the session with the claims from the `id_token`.
 
-{{ SAMPLE-DEVELOPER: ADD SETTING USER SESSION CODE HERE }}
+```python
+# views.py
+
+def validate_user(claims):
+    # Create user for django session
+
+    user = authenticate(
+        username=claims['email'],
+        password=claims['sub']
+    )
+
+    if user is None:
+        # Create user
+        new_user = User.objects.create_user(
+            claims['email'],
+            claims['email'],
+            claims['sub']
+        )
+
+        user = authenticate(
+            username=claims['email'],
+            password=claims['sub']
+        )
+
+    # Update user profile
+    if not hasattr(user, 'profile'):
+        profile = Profile()
+        profile.user = user
+        profile.save()
+
+    return user
+```
 
 ### Logout
 In django, you can clear the the user session by:
 
-{{ SAMPLE-DEVELOPER: ADD LOGOUT CODE HERE }}
+```python
+# views.py
+
+def logout_controller(request):
+    # Log user out
+
+    # Clear existing user
+    user = User.objects.get(username=request.user).delete()
+    logout(request)
+
+    return redirect('/')
+```
 
 The Okta session is terminated in our client-side code.
 
