@@ -10,8 +10,5 @@ import sys
 from django.core.wsgi import get_wsgi_application
 
 
-print("Starting development server")
-sys.stdout.flush()
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "samples.settings")
 application = get_wsgi_application()

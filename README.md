@@ -64,20 +64,17 @@ Create an isolated virtual environment
 Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/) via pip:
 ```
 [samples-python-django]$ pip install virtualenv
-```
-Create the virtual environment:
-```
+
+# Create the virtual environment:
 [samples-python-django]$ virtualenv venv
-```
-Activate the virtual environment:
-```
+
+# Activate the virtual environment:
 [samples-python-django]$ source venv/bin/activate
-```
-When you are finished working inside of the virtual environment, you can deactivate it:
-```
+
+# When you are finished working inside of the virtual environment, you can deactivate it:
+
 (venv)[samples-python-django]$ deactivate
 ```
-
 
 ## Quick Start
 
@@ -87,16 +84,24 @@ By default, this application uses a mock authorization server which responds to 
 
 To start the mock server, run the following in a second terminal window:
 ```bash
-# Starts the mock Okta server at http://127.0.0.01:7777
+# Starts the mock Okta server at http://127.0.0.1:7777
 [samples-python-django]$ npm run mock-okta
 ```
 
-If you'd like to test this sample against your own Okta org, follow [these steps to setup an OpenID Connect app](docs/assets/oidc-app-setup.md). Then, replace the *oidc* settings in `samples.config.json` to point to your new app:
+If you'd like to test this sample against your own Okta org, navigate to the Okta Developer Dashboard and follow these steps:
+
+1. Create a new **Web** application by selecting **Create New Application** from the *Applications* page.		
+2. After accepting the default configuration, select **Create Application** to redirect back to the *General Settings* of your application.		
+3. Copy the **Client ID** and **Client Secret**, as it will be needed for the client configuration.
+4. Finally, navigate to `https://{yourOktaDomain}.com/oauth2/default` to see if the [Default Authorization Server](https://developer.okta.com/docs/api/resources/oauth2.html#using-the-default-authorization-server) is setup. If not, [let us know](mailto:developers@okta.com).
+
+Then, replace the *oidc* settings in `.samples.config.json` to point to your new app:
 ```javascript
 // .samples.config.json
 {
   "oidc": {
-    "oktaUrl": "https://{{yourOktaOrg}}.oktapreview.com",
+    "oktaUrl": "https://{{yourOktaDomain}}.com",
+    "issuer": "https://{{yourOktaDomain}}.com/oauth2/default",
     "clientId": "{{yourClientId}}",
     "clientSecret": "{{yourClientSecret}}",
     "redirectUri": "http://localhost:3000/authorization-code/callback"
@@ -122,6 +127,7 @@ class LoginRedirectController {
    $onInit() {
     this.authClient = new OktaAuth({
       url: this.config.oktaUrl,
+      issuer: this.config.issuer,
       clientId: this.config.clientId,
       redirectUri: this.config.redirectUri,
       scopes: ['openid', 'email', 'profile'],
@@ -141,7 +147,6 @@ There are a number of different ways to construct the login redirect URL.
 3. Use [AuthJS](http://developer.okta.com/code/javascript/okta_auth_sdk)
 
 In this sample, we use AuthJS to create the URL and perform the redirect. An `OktaAuth` object is instantiated with the configuration in `.samples.config.json`. When the `login()` function is called from the view, it calls the [`/authorize`](http://developer.okta.com/docs/api/resources/oauth2.html#authentication-request) endpoint to start the [Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-1.3.1).
- 
 
 You can read more about the `OktaAuth` configuration options here: [OpenID Connect with Okta AuthJS SDK](http://developer.okta.com/code/javascript/okta_auth_sdk#social-authentication-and-openid-connect).
 
@@ -169,6 +174,7 @@ class LoginCustomController {
       clientId: this.config.clientId,
       redirectUri: this.config.redirectUri,
       authParams: {
+        issuer: this.config.issuer,
         responseType: 'code',
         scopes: ['openid', 'email', 'profile'],
       },
@@ -316,8 +322,7 @@ def fetch_jwk_for(id_token=None):
     if id_token is None:
         raise NameError('id_token is required')
 
-    # This will be pulled from the OpenID connect Discovery Document
-    jwks_uri = 'http://127.0.0.1:7777/oauth2/v1/keys'
+    jwks_uri = '{}/v1/keys'.format(issuer)
 
     unverified_header = jws.get_unverified_header(id_token)
     key_id = None
@@ -331,7 +336,7 @@ def fetch_jwk_for(id_token=None):
         # If we've already cached this JWK, return it
         return settings.PUBLIC_KEY_CACHE[key_id]
 
-    # If it's not in the cache, get the latest JWKS from /oauth2/v1/keys
+    # If it's not in the cache, get the latest JWKS from /oauth2/default/v1/keys
     r = requests.get(jwks_uri)
     jwks = r.json()
 
@@ -344,7 +349,6 @@ def fetch_jwk_for(id_token=None):
     else:
         raise RuntimeError('Unable to fetch public key from jwks_uri')
 ```
-
 
 #### Verify fields
 
@@ -370,7 +374,7 @@ jwt_kwargs = {
         # Used for leeway on the 'exp' claim
         'leeway': clock_skew
     },
-    'issuer': okta_config.oidc['oktaUrl'],
+    'issuer': okta_config.oidc['issuer'],
     'audience': okta_config.oidc['clientId']
 }
 
@@ -380,10 +384,8 @@ claims = jwt.decode(
     **jwt_kwargs)
 ```
 
-
 #### Verify issued time
 The `iat` value indicates what time the token was "issued at". We verify that this claim is valid by checking that the token was not issued in the future, with some leeway for clock skew.
-
 
 ```python
 # tokens.py
@@ -397,7 +399,6 @@ plus_acceptable_iat = calendar.timegm(
 if 'iat' in claims and claims['iat'] > plus_acceptable_iat:
     return 'invalid iat claim', 401
 ```
-
 
 #### Verify nonce
 To mitigate replay attacks, verify that the `nonce` value in the `id_token` matches the `nonce` stored in the cookie `okta-oauth-nonce`.
@@ -467,7 +468,7 @@ The Okta session is terminated in our client-side code.
 ## Conclusion
 You have now successfully authenticated with Okta! Now what? With a user's `id_token`, you have basic claims into the user's identity. You can extend the set of claims by modifying the `response_type` and `scopes` to retrieve custom information about the user. This includes `locale`, `address`, `phone_number`, `groups`, and [more](http://developer.okta.com/docs/api/resources/oidc.html#scopes).
 
-## Support 
+## Support
 
 Have a question or see a bug? Email developers@okta.com. For feature requests, feel free to open an issue on this repo. If you find a security vulnerability, please follow our [Vulnerability Reporting Process](https://www.okta.com/vulnerability-reporting-policy/).
 
@@ -478,4 +479,3 @@ Copyright 2017 Okta, Inc. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-

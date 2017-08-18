@@ -8,12 +8,12 @@ import calendar
 import requests
 
 
-def fetch_jwk_for(base_url, id_token=None):
+def fetch_jwk_for(issuer, id_token=None):
     if id_token is None:
         raise NameError('id_token is required')
 
     # FIXME: This should be pulled from the OpenID connect Discovery Document
-    jwks_uri = '{}/oauth2/v1/keys'.format(base_url)
+    jwks_uri = '{}/v1/keys'.format(issuer)
 
     unverified_header = jws.get_unverified_header(id_token)
     key_id = None
@@ -26,8 +26,6 @@ def fetch_jwk_for(base_url, id_token=None):
     if key_id in settings.PUBLIC_KEY_CACHE:
         return settings.PUBLIC_KEY_CACHE[key_id]
 
-    # FIXME: Make sure that we rate-limit outbound requests
-    # (Karl used bucket rate limiting here 'leaky bucket')
     r = requests.get(jwks_uri)
     jwks = r.json()
 
@@ -46,17 +44,16 @@ def token_validation(tokens, okta_config, nonce):
 
     try:
         clock_skew = 300
-        jwks_with_public_key = fetch_jwk_for(okta_config.oidc['oktaUrl'], tokens['id_token'])
+        jwks_with_public_key = fetch_jwk_for(okta_config.oidc['issuer'], tokens['id_token'])
 
         jwt_kwargs = {
             'algorithms': jwks_with_public_key['alg'],
             'options': {
-                # FIXME: Remove when mock server returns valid access_tokens
                 'verify_at_hash': False,
                 # Used for leeway on the 'exp' claim
                 'leeway': clock_skew
             },
-            'issuer': okta_config.oidc['oktaUrl'],
+            'issuer': okta_config.oidc['issuer'],
             'audience': okta_config.oidc['clientId']
         }
 

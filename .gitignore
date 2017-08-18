@@ -6,3 +6,4 @@ travis_phantomjs
 .DS_Store
 .vscode
 *.pyc
+__pycache__

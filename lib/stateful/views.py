@@ -89,7 +89,7 @@ def callback_controller(request):
         return HttpResponse('Code was not returned', status=401)
 
     # Setup Token Request
-    token_endpoint = '{}/oauth2/v1/token?'.format(okta_config.oidc['oktaUrl'])
+    token_endpoint = '{}/v1/token?'.format(okta_config.oidc['issuer'])
 
     tokens = call_token_endpoint(
         token_endpoint,

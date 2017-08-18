@@ -4,7 +4,7 @@
     "environment": "python",
     "framework": "django",
     "name": "samples-python-django",
-    "version": "1.12.0",
+    "version": "1.16.0",
     "parentType": "sample"
   }
 }
